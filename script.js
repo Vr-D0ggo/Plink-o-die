@@ -16,27 +16,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const playAgainButton = document.getElementById('playAgainButton');
 
     // --- Game Constants & Variables ---
-   const DICE_SIZE = 100;
-const DOT_RADIUS = 8;
-const NUM_TOP_HOLES = 5;
+    const DICE_SIZE = 100;
+    const DOT_RADIUS = 8;
+    const NUM_TOP_HOLES = 5;
 
-let BALL_RADIUS = 9;
-let TRIANGLE_BASE_WIDTH_NORMAL;
-let TRIANGLE_HEIGHT_NORMAL;
-let TRIANGLE_ROW2_SIZE_MULTIPLIER = 0.9;  // Row 2: 90% base width of normal
-let TRIANGLE_ROW3_SIZE_MULTIPLIER = 0.8;  // Row 3: 80% base width of normal
-let ROW2_HEIGHT_BOOST_FACTOR = 1.15;      // Row 2 triangles 15% taller than their scaled base would suggest
-let ROW3_HEIGHT_BOOST_FACTOR = 1.25;      // Row 3 triangles 25% taller
+    let BALL_RADIUS = 9;
+    let TRIANGLE_BASE_WIDTH_UNIFIED; // All main triangles will use this base width
+    let TRIANGLE_HEIGHT_UNIFIED;   // All main triangles will use this height
 
-let GRAVITY = 0.06;
-let MAX_VX = 1.8;
-let MAX_VY = 2.5;
-let COLLISION_VX_DAMPING = 0.8;
-let COLLISION_VY_DAMPING = -0.25;
+    // Remove or comment out these as they are no longer used for main rows:
+    // let TRIANGLE_ROW2_SIZE_MULTIPLIER = 0.9;
+    // let TRIANGLE_ROW3_SIZE_MULTIPLIER = 0.8;
+    // let ROW2_HEIGHT_BOOST_FACTOR = 1.15;
+    // let ROW3_HEIGHT_BOOST_FACTOR = 1.25;
 
-const TOP_AREA_FACTOR = 0.1;
-const PEG_ROWS_AREA_FACTOR = 0.55; // Keep it less tall
-const SLOT_AREA_HEIGHT_FACTOR = 0.15;
+    let GRAVITY = 0.06;
+    let MAX_VX = 1.8;
+    let MAX_VY = 2.5;
+    let COLLISION_VX_DAMPING = 0.8;
+    let COLLISION_VY_DAMPING = -0.25;
+
+    const TOP_AREA_FACTOR = 0.1;
+    const PEG_ROWS_AREA_FACTOR = 0.55;
+    const SLOT_AREA_HEIGHT_FACTOR = 0.15;
 
     let die1Value = 1, die2Value = 1;
     let die1Canvas, die2Canvas, die1Ctx, die2Ctx;
@@ -171,104 +173,67 @@ const SLOT_AREA_HEIGHT_FACTOR = 0.15;
     }
 
     function setupPlinkoBoard() {
-    triangles = [];
-    prizeSlots = [];
-    const boardWidth = plinkoCanvas.width;
-    const boardHeight = plinkoCanvas.height;
+        triangles = [];
+        prizeSlots = [];
+        const boardWidth = plinkoCanvas.width;
+        const boardHeight = plinkoCanvas.height;
 
-    const topEntryAreaHeight = boardHeight * TOP_AREA_FACTOR;
-    const triangleRowsTotalHeight = boardHeight * PEG_ROWS_AREA_FACTOR;
-    const numMainTriangleRows = 3; // 5, 10, 11
-    // Equidistant vertical spacing for the *centers* of the rows
-    const effectiveRowSpacing = triangleRowsTotalHeight / numMainTriangleRows;
+        const topEntryAreaHeight = boardHeight * TOP_AREA_FACTOR;
+        const triangleRowsTotalHeight = boardHeight * PEG_ROWS_AREA_FACTOR;
+        const numMainTriangleRows = 3; // 5, 10, 11
+        const effectiveRowSpacing = triangleRowsTotalHeight / numMainTriangleRows;
 
-    const triangleCounts = [5, 10, 11];
-    let previousRowTriangles = []; // To store triangle data from the row above for alignment
+        const triangleCounts = [5, 10, 11];
 
-    // Determine NORMAL triangle base width (reference size)
-    // Based on fitting 10 triangles (the count of row 1 before its own scaling factor)
-    const referenceTriangleCountForNormal = 10;
-    const desiredChannelWidthForNormalCalc = BALL_RADIUS * 1.7;
+        // Determine UNIFIED triangle base width.
+        // This size MUST allow the row with 11 triangles to fit.
+        const mostConstrainedCount = 11;
+        const minChannelWidth = BALL_RADIUS * 1.8; // Decent channel around the small triangles
 
-    let spaceForTrianglesAndChannels = boardWidth * 0.96;
-    TRIANGLE_BASE_WIDTH_NORMAL = (spaceForTrianglesAndChannels - (referenceTriangleCountForNormal + 1) * desiredChannelWidthForNormalCalc) / referenceTriangleCountForNormal;
-    TRIANGLE_BASE_WIDTH_NORMAL = Math.max(BALL_RADIUS * 1.6, TRIANGLE_BASE_WIDTH_NORMAL);
-    TRIANGLE_BASE_WIDTH_NORMAL = Math.min(boardWidth / 7, TRIANGLE_BASE_WIDTH_NORMAL); // Cap max width
-    TRIANGLE_HEIGHT_NORMAL = TRIANGLE_BASE_WIDTH_NORMAL * 0.866; // Default equilateral aspect
+        let spaceForTrianglesAndChannels = boardWidth * 0.98; // Use almost full width
+        TRIANGLE_BASE_WIDTH_UNIFIED = (spaceForTrianglesAndChannels - (mostConstrainedCount + 1) * minChannelWidth) / mostConstrainedCount;
+        TRIANGLE_BASE_WIDTH_UNIFIED = Math.max(BALL_RADIUS * 1.5, TRIANGLE_BASE_WIDTH_UNIFIED); // Min base
+        // Cap max width to prevent them from being huge if board is wide and count is low (though 11 is high)
+        TRIANGLE_BASE_WIDTH_UNIFIED = Math.min(boardWidth / (mostConstrainedCount * 0.8), TRIANGLE_BASE_WIDTH_UNIFIED);
+        TRIANGLE_HEIGHT_UNIFIED = TRIANGLE_BASE_WIDTH_UNIFIED * 0.866; // Equilateral aspect ratio
 
-    for (let r = 0; r < numMainTriangleRows; r++) {
-        const numTrianglesThisRow = triangleCounts[r];
-        let currentRowTriangles = []; // Store triangles of the current row being placed
+        let previousRowTriangles = [];
 
-        let currentTriangleBaseWidth = TRIANGLE_BASE_WIDTH_NORMAL;
-        let currentTriangleHeight = TRIANGLE_HEIGHT_NORMAL; // Start with normal aspect ratio
+        for (let r = 0; r < numMainTriangleRows; r++) {
+            const numTrianglesThisRow = triangleCounts[r];
+            let currentRowTriangles = [];
 
-        if (r === 1) { // Second row (index 1, 10 triangles)
-            currentTriangleBaseWidth *= TRIANGLE_ROW2_SIZE_MULTIPLIER;
-            // Height: base aspect + boost
-            currentTriangleHeight = (currentTriangleBaseWidth * 0.866) * ROW2_HEIGHT_BOOST_FACTOR;
-        } else if (r === 2) { // Third row (index 2, 11 triangles)
-            currentTriangleBaseWidth *= TRIANGLE_ROW3_SIZE_MULTIPLIER;
-            currentTriangleHeight = (currentTriangleBaseWidth * 0.866) * ROW3_HEIGHT_BOOST_FACTOR;
-        }
-        // Row 0 uses TRIANGLE_BASE_WIDTH_NORMAL and TRIANGLE_HEIGHT_NORMAL
+            // All main rows now use the UNIFIED size
+            const currentTriangleBaseWidth = TRIANGLE_BASE_WIDTH_UNIFIED;
+            const currentTriangleHeight = TRIANGLE_HEIGHT_UNIFIED;
 
-        // Y position for the center of the triangles in this row
-        const yPos = topEntryAreaHeight + (r * effectiveRowSpacing) + effectiveRowSpacing / 2;
+            const yPos = topEntryAreaHeight + (r * effectiveRowSpacing) + effectiveRowSpacing / 2;
 
-        if (r === 0) { // First row (5 triangles), align under funnels
-            const funnelSpacing = boardWidth / (NUM_TOP_HOLES + 1);
-            for (let i = 0; i < numTrianglesThisRow; i++) {
-                const funnelCenterX = funnelSpacing * (i + 1);
-                const centerX = funnelCenterX;
-                const bottomY = yPos + currentTriangleHeight / 2;
-                const topY = yPos - currentTriangleHeight / 2;
-                const newTri = {
-                    id: `r${r}t${i}`, cx: centerX, cy: yPos,
-                    p1: { x: centerX, y: topY }, p2: { x: centerX + currentTriangleBaseWidth / 2, y: bottomY },
-                    p3: { x: centerX - currentTriangleBaseWidth / 2, y: bottomY },
-                    baseWidth: currentTriangleBaseWidth, height: currentTriangleHeight, isDivider: false
-                };
-                triangles.push(newTri);
-                currentRowTriangles.push(newTri);
-            }
-        } else { // Subsequent rows (attempt to align tips with gaps above)
-            if (previousRowTriangles.length > 0) {
-                // Target X positions are midpoints of gaps in `previousRowTriangles`
-                let targetXCoords = [];
-                // Add targets for edge cases (left and right of the entire previous row)
-                // targetXCoords.push(previousRowTriangles[0].cx - previousRowTriangles[0].baseWidth/2 - currentTriangleBaseWidth/2 - BALL_RADIUS); // Far left
-                for (let i = 0; i < previousRowTriangles.length - 1; i++) {
-                    const triAbove1 = previousRowTriangles[i];
-                    const triAbove2 = previousRowTriangles[i+1];
-                    // Midpoint of the horizontal space between the bottom-right of tri1 and bottom-left of tri2
-                    // For upward triangles, this is the space between their bases.
-                    const gapCenterX = ( (triAbove1.cx + triAbove1.baseWidth / 2) + (triAbove2.cx - triAbove2.baseWidth / 2) ) / 2;
-                    targetXCoords.push(gapCenterX);
-                }
-                // targetXCoords.push(previousRowTriangles[previousRowTriangles.length-1].cx + previousRowTriangles[previousRowTriangles.length-1].baseWidth/2 + currentTriangleBaseWidth/2 + BALL_RADIUS); // Far right
+            const totalOccupiedByTriangles = numTrianglesThisRow * currentTriangleBaseWidth;
+            const totalSpaceForChannels = boardWidth - totalOccupiedByTriangles;
+            const individualChannelWidthThisRow = Math.max(BALL_RADIUS * 0.6, totalSpaceForChannels / (numTrianglesThisRow + 1));
 
+            let currentX = individualChannelWidthThisRow;
 
-                // Distribute `numTrianglesThisRow` among `targetXCoords`.
-                // This is complex if counts don't match (e.g., 4 gaps from 5 triangles, but need to place 10).
-                // Simplification: Spread them out, trying to hit some targets.
-                const totalSpaceForChannelsThisRow = boardWidth - (numTrianglesThisRow * currentTriangleBaseWidth);
-                const individualChannelWidthThisRow = Math.max(BALL_RADIUS * 0.8, totalSpaceForChannelsThisRow / (numTrianglesThisRow + 1));
-                let currentX = individualChannelWidthThisRow;
-
+            if (r === 0) { // First row of 5 triangles, align under funnels
+                const funnelSpacing = boardWidth / (NUM_TOP_HOLES + 1);
                 for (let i = 0; i < numTrianglesThisRow; i++) {
-                    // Attempt to use a targetXCoord if available and reasonable, otherwise use equidistant
-                    let centerX;
-                    if (targetXCoords.length > 0 && numTrianglesThisRow <= targetXCoords.length +1 ) { // If enough targets for most triangles
-                        // This logic needs to be smarter to pick the best target
-                        // For now, just use equidistant and hope for the best with staggering.
-                        // A true alignment would involve matching targetXCoords to triangle indices.
-                         centerX = currentX + currentTriangleBaseWidth / 2;
-                    } else {
-                         centerX = currentX + currentTriangleBaseWidth / 2;
-                    }
-
-
+                    const funnelCenterX = funnelSpacing * (i + 1);
+                    const centerX = funnelCenterX;
+                    const bottomY = yPos + currentTriangleHeight / 2;
+                    const topY = yPos - currentTriangleHeight / 2;
+                    const newTri = {
+                        id: `r${r}t${i}`, cx: centerX, cy: yPos,
+                        p1: { x: centerX, y: topY }, p2: { x: centerX + currentTriangleBaseWidth / 2, y: bottomY },
+                        p3: { x: centerX - currentTriangleBaseWidth / 2, y: bottomY },
+                        baseWidth: currentTriangleBaseWidth, height: currentTriangleHeight, isDivider: false
+                    };
+                    triangles.push(newTri);
+                    currentRowTriangles.push(newTri);
+                }
+            } else { // Subsequent main rows (row 1 with 10, row 2 with 11)
+                for (let i = 0; i < numTrianglesThisRow; i++) {
+                    const centerX = currentX + currentTriangleBaseWidth / 2;
                     if (centerX < -currentTriangleBaseWidth / 2 || centerX > boardWidth + currentTriangleBaseWidth / 2) {
                         currentX += currentTriangleBaseWidth + individualChannelWidthThisRow;
                         continue;
@@ -285,60 +250,46 @@ const SLOT_AREA_HEIGHT_FACTOR = 0.15;
                     currentRowTriangles.push(newTri);
                     currentX += currentTriangleBaseWidth + individualChannelWidthThisRow;
                 }
-
-            } else { // Fallback for row 1 if previousRow is empty (should not happen after row 0)
-                const totalSpaceForChannelsThisRow = boardWidth - (numTrianglesThisRow * currentTriangleBaseWidth);
-                const individualChannelWidthThisRow = Math.max(BALL_RADIUS * 0.8, totalSpaceForChannelsThisRow / (numTrianglesThisRow + 1));
-                let currentX = individualChannelWidthThisRow;
-                for (let i = 0; i < numTrianglesThisRow; i++) {
-                    const centerX = currentX + currentTriangleBaseWidth / 2;
-                    // ... create triangle ... (same as above)
-                    const bottomY = yPos + currentTriangleHeight / 2;
-                    const topY = yPos - currentTriangleHeight / 2;
-                    const newTri = { /* ... */ };
-                    triangles.push(newTri);
-                    currentRowTriangles.push(newTri);
-                    currentX += currentTriangleBaseWidth + individualChannelWidthThisRow;
-                }
             }
+            previousRowTriangles = currentRowTriangles;
         }
-        previousRowTriangles = currentRowTriangles; // Store for the next iteration
+
+        // Prize Slots
+        const prizeValues = [6, 4, 3, 2, 0, 1, 0, 2, 3, 4, 6];
+        const numPrizeSlots = prizeValues.length;
+        const slotWidth = boardWidth / numPrizeSlots;
+        const slotAreaActualHeight = boardHeight * SLOT_AREA_HEIGHT_FACTOR;
+        const slotY = boardHeight - slotAreaActualHeight;
+
+        for (let i = 0; i < numPrizeSlots; i++) {
+            prizeSlots.push({
+                x: i * slotWidth, y: slotY, width: slotWidth, height: slotAreaActualHeight,
+                value: prizeValues[i], label: (prizeValues[i] >= 0 ? "+" : "") + prizeValues[i],
+                bottomFloorY: slotY + slotAreaActualHeight - BALL_RADIUS
+            });
+        }
+
+        // Final row of 10 dividers, resting on slots
+        const numDividers = 10;
+        // Divider size can be relative to the UNIFIED triangle height or fixed
+        const dividerTriangleHeight = TRIANGLE_HEIGHT_UNIFIED * 0.5; // Half the height of main triangles
+        const dividerTriangleBase = Math.max(BALL_RADIUS * 0.25, TRIANGLE_BASE_WIDTH_UNIFIED * 0.1); // Very thin
+
+        for (let i = 0; i < numDividers; i++) {
+            const centerX = (i + 1) * slotWidth;
+            const adjustedBottomY = slotY;
+            const adjustedTopY = slotY - dividerTriangleHeight;
+            const adjustedCenterY = slotY - dividerTriangleHeight / 2;
+            triangles.push({
+                id: `div${i}`, cx: centerX, cy: adjustedCenterY,
+                p1: { x: centerX, y: adjustedTopY },
+                p2: { x: centerX + dividerTriangleBase / 2, y: adjustedBottomY },
+                p3: { x: centerX - dividerTriangleBase / 2, y: adjustedBottomY },
+                baseWidth: dividerTriangleBase, height: dividerTriangleHeight,
+                isDivider: true
+            });
+        }
     }
-
-    // Prize Slots and Divider Triangles
-    const prizeValues = [6, 4, 3, 2, 0, 1, 0, 2, 3, 4, 6];
-    const numPrizeSlots = prizeValues.length;
-    const slotWidth = boardWidth / numPrizeSlots;
-    const slotAreaActualHeight = boardHeight * SLOT_AREA_HEIGHT_FACTOR;
-    const slotY = boardHeight - slotAreaActualHeight;
-
-    for (let i = 0; i < numPrizeSlots; i++) {
-        prizeSlots.push({
-            x: i * slotWidth, y: slotY, width: slotWidth, height: slotAreaActualHeight,
-            value: prizeValues[i], label: (prizeValues[i] >= 0 ? "+" : "") + prizeValues[i],
-            bottomFloorY: slotY + slotAreaActualHeight - BALL_RADIUS
-        });
-    }
-
-    const numDividers = 10; // Your 4th specified count for "pegs"
-    const dividerTriangleHeight = TRIANGLE_HEIGHT_NORMAL * 0.4; // Shorter
-    const dividerTriangleBase = Math.max(BALL_RADIUS * 0.25, TRIANGLE_BASE_WIDTH_NORMAL * 0.08); // Very thin
-
-    for (let i = 0; i < numDividers; i++) {
-        const centerX = (i + 1) * slotWidth; // Align with slot divisions
-        const adjustedBottomY = slotY;
-        const adjustedTopY = slotY - dividerTriangleHeight;
-        const adjustedCenterY = slotY - dividerTriangleHeight / 2;
-        triangles.push({
-            id: `div${i}`, cx: centerX, cy: adjustedCenterY,
-            p1: { x: centerX, y: adjustedTopY },
-            p2: { x: centerX + dividerTriangleBase / 2, y: adjustedBottomY },
-            p3: { x: centerX - dividerTriangleBase / 2, y: adjustedBottomY },
-            baseWidth: dividerTriangleBase, height: dividerTriangleHeight,
-            isDivider: true
-        });
-    }
-}
 
     function startPlinko(startingHoleIndex) {
         gamePhase = 'plinko';
