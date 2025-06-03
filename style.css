@@ -1,83 +1,201 @@
+/* style.css */
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Arial', sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
     margin: 0;
     padding: 20px;
-    background-color: #f0f0f0;
+    background-color: #f4f7f6; /* Lighter, slightly cool main background */
+    color: #333;
+    min-height: 100vh;
+    box-sizing: border-box;
+    transition: background-color 0.5s ease; /* For color change */
+}
+
+/* Styles for the Dice Rolling Screen */
+body:not(.plinko-active) {
+    background-color: #e1f5fe; /* Light blue sky */
+}
+
+body.plinko-active {
+    overflow: hidden;
+    padding: 0;
+    background-color: #2c3e50; /* Keep dark for plinko */
+}
+body.plinko-active h1,
+body.plinko-active .game-container {
+    display: none !important;
+}
+
+h1 {
+    color: #01579b; /* Deeper blue for title */
+    margin-bottom: 25px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
 }
 
 .game-container {
     display: flex;
     gap: 30px;
-    margin-bottom: 20px;
-    align-items: flex-start; /* Align items to the top */
+    margin-bottom: 25px;
+    align-items: flex-start;
+    max-width: 950px;
+    width: 100%;
+    padding: 20px;
+    background: linear-gradient(135deg, #ffffff, #e0e0e0); /* Subtle gradient for container */
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
 }
 
-.dice-section, .info-section, .plinko-section {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+.dice-section, .info-section {
+    background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent white */
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     text-align: center;
+    flex-basis: 0;
+    flex-grow: 1;
+}
+.dice-section h2, .info-section h3 {
+    color: #0277bd; /* Medium blue for subheadings */
+    margin-bottom: 20px;
 }
 
 #dice-area {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 20px; /* Space between dice */
-    margin-bottom: 20px;
-    min-height: 120px; /* Ensure space for dice */
+    gap: 25px;
+    margin: 30px 0;
+    min-height: 110px;
 }
 
-.die-canvas { /* Class for individual die canvases */
-    border: 1px solid #ccc;
-    background-color: #fff;
+.die-canvas {
+    border: none; /* Remove border, shadow gives depth */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background-color: #fff; /* Pure white for dice */
+    border-radius: 12px;
 }
-
 
 button {
-    padding: 10px 20px;
-    font-size: 16px;
+    padding: 14px 28px;
+    font-size: 1.05em;
+    font-weight: bold;
     cursor: pointer;
-    background-color: #007bff;
+    background-image: linear-gradient(to right, #00c6ff, #0072ff); /* Blue gradient */
     color: white;
     border: none;
-    border-radius: 5px;
-    margin-top: 10px;
+    border-radius: 10px;
+    margin-top: 20px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 10px rgba(0, 114, 255, 0.3);
+}
+button:hover {
+    background-image: linear-gradient(to right, #0072ff, #00c6ff);
+    box-shadow: 0 6px 15px rgba(0, 114, 255, 0.4);
+    transform: translateY(-2px);
+}
+button:disabled {
+    background-image: linear-gradient(to right, #bdc3c7, #95a5a6);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: translateY(0);
+}
+button:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 2px 5px rgba(0, 114, 255, 0.3);
 }
 
-button:hover {
-    background-color: #0056b3;
-}
 
 table {
     width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
+    border-collapse: separate; /* For rounded corners on cells */
+    border-spacing: 0;
+    margin-top: 15px;
+    font-size: 0.9em;
+    border-radius: 10px;
+    overflow: hidden; /* To make border-radius work on table */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
+    border: 1px solid #e8eff5; /* Lighter cell borders */
+    padding: 12px;
     text-align: center;
 }
 
 th {
-    background-color: #f2f2f2;
+    background-color: #4fc3f7; /* Light blue for table header */
+    color: white;
+    font-weight: bold;
+}
+td {
+    background-color: #fafdff;
+}
+tr:nth-child(even) td {
+    background-color: #f2f8fc;
 }
 
-#plinkoCanvas {
-    border: 2px solid #333;
-    background-color: #e0e0e0;
-    display: block; /* Remove extra space below canvas */
-    margin: 0 auto; /* Center canvas if plinko-section is wider */
+
+.plinko-section {
+    /* display: none; controlled by JS */
 }
 
-#rollResult, #plinkoOutcome {
+.plinko-section.full-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1000;
+    background-color: #2c3e50;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.plinko-section.full-screen #plinkoCanvas {
+    display: block;
+    border: none;
+}
+
+.plinko-message-overlay {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1010;
+    color: white;
+    text-align: center;
+    background-color: rgba(30, 40, 50, 0.9); /* Darker semi-transparent */
+    padding: 25px 35px;
+    border-radius: 15px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.6);
+    width: clamp(300px, 80%, 500px); /* Responsive width */
+}
+
+#plinkoOutcome.plinko-message-overlay {
+    bottom: 120px; /* More space for button */
+    font-size: clamp(1.3em, 3.5vh, 2em);
+    line-height: 1.6;
+}
+
+#playAgainButton.plinko-message-overlay {
+    bottom: 40px;
+    padding: 18px 35px;
+    font-size: clamp(1.1em, 2.8vh, 1.5em);
+    background-image: linear-gradient(to right, #ff512f, #dd2476); /* Red/Pink gradient */
+}
+#playAgainButton.plinko-message-overlay:hover {
+    background-image: linear-gradient(to right, #dd2476, #ff512f);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(221, 36, 118, 0.4);
+}
+
+
+#rollResult {
     font-weight: bold;
     margin-top: 15px;
-    min-height: 20px; /* Prevent layout shift */
+    min-height: 22px;
+    color: #0288d1; /* Slightly darker blue for result */
+    font-size: 1.1em;
 }
